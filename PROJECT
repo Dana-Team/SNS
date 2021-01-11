@@ -1,0 +1,7 @@
+domain: github.com/Dana-Team/SNS
+repo: github.com/Dana-Team/SNS
+resources:
+- group: dana
+  kind: Subnamespace
+  version: v1alpha1
+version: "2"

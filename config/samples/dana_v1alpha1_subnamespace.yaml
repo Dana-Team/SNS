@@ -1,0 +1,7 @@
+apiVersion: dana.github.com/Dana-Team/SNS/v1alpha1
+kind: Subnamespace
+metadata:
+  name: subnamespace-sample
+spec:
+  # Add fields here
+  foo: bar
