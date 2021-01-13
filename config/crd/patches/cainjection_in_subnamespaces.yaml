@@ -5,4 +5,4 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: $(CERTIFICATE_NAMESPACE)/$(CERTIFICATE_NAME)
-  name: subnamespaces.dana.github.com/Dana-Team/SNS
+  name: subnamespaces.dana.dana.hns.io

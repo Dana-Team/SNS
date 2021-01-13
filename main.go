@@ -61,7 +61,7 @@ func main() {
 		MetricsBindAddress: metricsAddr,
 		Port:               9443,
 		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "c1382367.github.com/Dana-Team/SNS",
+		LeaderElectionID:   "c1382367.dana.hns.io",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

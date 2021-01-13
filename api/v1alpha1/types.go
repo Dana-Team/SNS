@@ -4,8 +4,9 @@ type Phase string
 
 //Sns phases
 const (
-	Missing Phase = "missing"
-	Created Phase = "created"
+	Missing Phase = "Missing"
+	Created Phase = "Created"
+	None    Phase = ""
 )
 
 //MetaGroup
@@ -19,9 +20,10 @@ const (
 
 //Annotations
 const (
-	Role    = MetaGroup + "role"
-	Depth   = MetaGroup + "depth"
-	Pointer = MetaGroup + "pointer"
+	Role       = MetaGroup + "role"
+	Depth      = MetaGroup + "depth"
+	Pointer    = MetaGroup + "pointer"
+	SnsPointer = MetaGroup + "sns-pointer"
 )
 
 //Finalizers

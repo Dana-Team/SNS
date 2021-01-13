@@ -1,4 +1,4 @@
-apiVersion: dana.github.com/Dana-Team/SNS/v1alpha1
+apiVersion: dana.dana.hns.io/v1alpha1
 kind: Subnamespace
 metadata:
   name: subnamespace-sample
