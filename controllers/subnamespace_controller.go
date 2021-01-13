@@ -133,14 +133,13 @@ func (r *SubnamespaceReconciler) CreateNamespace(ctx context.Context, childNames
 
 func (r *SubnamespaceReconciler) InitializeSubspace(ctx context.Context, ownerNamespace v1.Namespace, subspace danav1alpha1.Subnamespace, childNamespaceName string) error {
 	if _, err := ctrl.CreateOrUpdate(ctx, r.Client, &subspace, func() error {
-		var subspaceOwnerRef []v1api.OwnerReference
-		subspaceOwnerRef = append(subspaceOwnerRef, *v1api.NewControllerRef(&ownerNamespace, ownerNamespace.GroupVersionKind()))
-		subspace.SetOwnerReferences(subspaceOwnerRef)
-
 		subspace.SetAnnotations(map[string]string{
 			danav1alpha1.Pointer: childNamespaceName,
 		})
 		subspace.Status.Phase = danav1alpha1.Missing
+		if err := ctrl.SetControllerReference(&ownerNamespace, &subspace, r.Scheme); err != nil {
+			return err
+		}
 		return nil
 	}); err != nil {
 		return err

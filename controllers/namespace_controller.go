@@ -19,6 +19,8 @@ package controllers
 import (
 	"context"
 	"github.com/go-logr/logr"
+	"reflect"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -158,6 +160,10 @@ func (r *NamespaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&corev1.Namespace{}).
 		//filter all namespace without the HNS label
 		WithEventFilter(NamespacePredicate{predicate.NewPredicateFuncs(func(object client.Object) bool {
+			//always allow reconcile for subnamespaces
+			if reflect.TypeOf(object) == reflect.TypeOf(&danav1alpha1.Subnamespace{}) {
+				return true
+			}
 			objLabels := object.GetLabels()
 			if _, ok := objLabels[danav1alpha1.Hns]; ok {
 				return true
