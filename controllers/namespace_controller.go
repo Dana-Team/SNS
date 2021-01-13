@@ -102,8 +102,13 @@ func (r *NamespaceReconciler) Update(ctx context.Context, log logr.Logger, names
 		return err
 	}
 
+	//if ns has no sns then he is a leaf
 	if len(snsList.Items) == 0 {
 		role = danav1alpha1.Leaf
+	}
+	//if ns has no parent then he is a root
+	if _, ok := namespace.Labels[danav1alpha1.Parent]; !ok {
+		role = danav1alpha1.Root
 	}
 
 	if _, err := ctrl.CreateOrUpdate(ctx, r.Client, namespace, func() error {
