@@ -4,8 +4,9 @@ type Phase string
 
 //Sns phases
 const (
-	Missing Phase = "missing"
-	Created Phase = "created"
+	Missing Phase = "Missing"
+	Created Phase = "Created"
+	None    Phase = ""
 )
 
 const (
