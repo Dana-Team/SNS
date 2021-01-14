@@ -11,7 +11,7 @@ import (
 
 type NamepsaceAnnotator struct {
 	Client  client.Client
-	decoder *admission.Decoder
+	Decoder *admission.Decoder
 }
 
 // +kubebuilder:webhook:path=/validate-v1-namespace,mutating=false,failurePolicy=fail,groups="core",resources=namespaces,verbs=create;update,versions=v1,name=dana.nhs.io
@@ -21,7 +21,7 @@ func (a *NamepsaceAnnotator) Handle(ctx context.Context, req admission.Request) 
 	allowMessage := "Deleted successfully"
 	namespace := &corev1.Namespace{}
 
-	err := a.decoder.Decode(req, namespace)
+	err := a.Decoder.Decode(req, namespace)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
@@ -32,4 +32,8 @@ func (a *NamepsaceAnnotator) Handle(ctx context.Context, req admission.Request) 
 	}
 
 	return admission.Allowed(allowMessage)
+}
+func (a *NamepsaceAnnotator) InjectDecoder(d *admission.Decoder) error {
+	a.Decoder = d
+	return nil
 }
