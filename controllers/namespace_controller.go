@@ -125,6 +125,9 @@ func (r *NamespaceReconciler) Update(ctx context.Context, log logr.Logger, names
 func (r *NamespaceReconciler) CleanUp(ctx context.Context, log logr.Logger, namespace *corev1.Namespace) (shouldRequeue bool, err error) {
 	var sns danav1alpha1.Subnamespace
 
+	if namespace.Annotations[danav1alpha1.Role] == danav1alpha1.Root {
+		goto removeFinalizer
+	}
 	//check if sns is gone
 	if err := r.Get(ctx, client.ObjectKey{
 		Namespace: namespace.Labels[danav1alpha1.Parent],
@@ -143,6 +146,7 @@ func (r *NamespaceReconciler) CleanUp(ctx context.Context, log logr.Logger, name
 		log.Info("sns deleted")
 		return true, nil
 	}
+removeFinalizer:
 	//sns is gone did we already remove the finalizer
 	if !controllerutil.ContainsFinalizer(namespace, danav1alpha1.NsFinalizer) {
 		return false, nil
