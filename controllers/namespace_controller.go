@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"github.com/go-logr/logr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
@@ -48,57 +49,65 @@ type NamespacePredicate struct {
 
 func (r *NamespaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("namespace", req.NamespacedName)
-	log.Info("starting to reconcile")
+	log.V(1).Info("starting to reconcile")
 
 	var ns corev1.Namespace
 
+	//get namespace instance
 	if err := r.Get(ctx, req.NamespacedName, &ns); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("deleted")
+			log.V(2).Info("deleted")
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
 		log.Error(err, "unable to get Namespace")
 		return ctrl.Result{}, err
 	}
-	if ns.Annotations[danav1alpha1.Role] == danav1alpha1.Root {
+
+	//we dont want to reconcile on root namespace since there is no need to init, sync or cleanup after them
+	//also we must not add finalizer to root namespace since we wont be able to be deleted
+	if isRoot(&ns) {
+		log.V(3).Info("is root, skip")
 		return ctrl.Result{}, nil
 	}
+
 	//ns is being deleted
-	if !ns.DeletionTimestamp.IsZero() {
-		shouldRequeue, err := r.CleanUp(ctx, log, &ns)
-		return ctrl.Result{
-			Requeue: shouldRequeue,
-		}, err
+	if shouldCleanUp(&ns) {
+		log.V(3).Info("straing to clean up")
+		return ctrl.Result{}, r.CleanUp(ctx, log, &ns)
 	}
 
-	if controllerutil.ContainsFinalizer(&ns, danav1alpha1.NsFinalizer) {
-		err := r.Update(ctx, log, &ns)
-		return ctrl.Result{}, err
+	if shouldSync(&ns) {
+		log.V(3).Info("straing to sync")
+		return ctrl.Result{}, r.Sync(ctx, log, &ns)
 	}
 
-	err := r.Init(ctx, log, &ns)
-	return ctrl.Result{}, err
+	log.V(3).Info("straing to init")
+	return ctrl.Result{}, r.Init(ctx, log, &ns)
 }
 
+//Init is being called at the first time namesapce is be reconciled and adds a finalizer to it
 func (r *NamespaceReconciler) Init(ctx context.Context, log logr.Logger, namespace *corev1.Namespace) error {
-	if _, err := ctrl.CreateOrUpdate(ctx, r.Client, namespace, func() error {
-		controllerutil.AddFinalizer(namespace, danav1alpha1.NsFinalizer)
-		return nil
-	}); err != nil {
+
+	controllerutil.AddFinalizer(namespace, danav1alpha1.NsFinalizer)
+	if err := r.Update(ctx, namespace); err != nil {
 		if apierrors.IsConflict(err) {
-			log.Info("newer resource version exists")
+			log.V(2).Info("newer resource version exists")
 			return nil
 		}
-		log.Error(err, "unable to add finalizer")
+		log.Error(err, "unable to update namespace")
 		return err
 	}
-	log.Info("finalizer created")
+
 	return nil
 }
 
-func (r *NamespaceReconciler) Update(ctx context.Context, log logr.Logger, namespace *corev1.Namespace) error {
-	var snsList danav1alpha1.SubnamespaceList
-	role := danav1alpha1.NoRole
+//Sync is being call every time there is an update in the namepsace's children and make sure its role is up to date
+func (r *NamespaceReconciler) Sync(ctx context.Context, log logr.Logger, namespace *corev1.Namespace) error {
+
+	var (
+		role    = danav1alpha1.NoRole
+		snsList = danav1alpha1.SubnamespaceList{}
+	)
 
 	if err := r.List(ctx, &snsList, client.InNamespace(namespace.Name)); err != nil {
 		return err
@@ -108,58 +117,50 @@ func (r *NamespaceReconciler) Update(ctx context.Context, log logr.Logger, names
 	if len(snsList.Items) == 0 {
 		role = danav1alpha1.Leaf
 	}
-	//if ns has no parent then he is a root
-	if _, ok := namespace.Labels[danav1alpha1.Parent]; !ok {
-		role = danav1alpha1.Root
+
+	if namespace.Labels[danav1alpha1.Parent] == role {
+		return nil
 	}
 
-	if _, err := ctrl.CreateOrUpdate(ctx, r.Client, namespace, func() error {
-		namespace.Annotations[danav1alpha1.Role] = role
-		return nil
-	}); err != nil {
-		log.Error(err, "unable to update role")
+	namespace.Annotations[danav1alpha1.Role] = role
+	if err := r.Update(ctx, namespace); err != nil {
+		log.Error(err, "unable to update namespace")
 		return err
 	}
-
+	log.V(2).Info("role updated")
 	return nil
 }
 
-func (r *NamespaceReconciler) CleanUp(ctx context.Context, log logr.Logger, namespace *corev1.Namespace) (shouldRequeue bool, err error) {
-	var sns danav1alpha1.Subnamespace
+//CleanUp is being called when a namespace is being deleted,it deletes the subnamespace object related to the namespace inside its parent namespace,
+//also removing the finalizer from the namespace so it could be deleted
+func (r *NamespaceReconciler) CleanUp(ctx context.Context, log logr.Logger, namespace *corev1.Namespace) error {
 
-	//check if sns is gone
-	if err := r.Get(ctx, client.ObjectKey{
-		Namespace: namespace.Labels[danav1alpha1.Parent],
-		Name:      namespace.Annotations[danav1alpha1.SnsPointer],
-	}, &sns); err != nil {
-		if !apierrors.IsNotFound(err) {
-			log.Error(err, "unable to get Subnamespace")
-			return false, err
-		}
-	} else {
-		//sns still present
-		if err := r.Delete(ctx, &sns); err != nil {
-			log.Error(err, "unable to delete Subnamespace")
-			return false, err
-		}
-		log.Info("sns deleted")
-		return true, nil
+	sns := danav1alpha1.Subnamespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      namespace.Annotations[danav1alpha1.SnsPointer],
+			Namespace: namespace.Labels[danav1alpha1.Parent],
+		},
 	}
-	//sns is gone did we already remove the finalizer
-	if !controllerutil.ContainsFinalizer(namespace, danav1alpha1.NsFinalizer) {
-		return false, nil
-	}
-	//remove finalizer
-	if _, err := ctrl.CreateOrUpdate(ctx, r.Client, namespace, func() error {
-		controllerutil.RemoveFinalizer(namespace, danav1alpha1.NsFinalizer)
-		return nil
 
-	}); err != nil {
-		log.Error(err, "unable to remove finalizer")
-		return false, err
+	if err := r.Delete(ctx, &sns); err != nil {
+		//We should treat the case when the Delete did not find the subnamespace we are trying to delete
+		//since we must make sure the finalizer is removed even though the subnamespace is missing
+		if apierrors.IsNotFound(err) {
+			goto removeFinalizer
+		}
+		log.Error(err, "unable to delete Subnamespace")
+		return err
 	}
-	log.Info("finalizer removed")
-	return false, nil
+
+removeFinalizer:
+	controllerutil.RemoveFinalizer(namespace, danav1alpha1.NsFinalizer)
+	if err := r.Update(ctx, namespace); err != nil {
+		log.Error(err, "unable to update namespace")
+		return err
+	}
+
+	log.V(2).Info("cleaned up")
+	return nil
 }
 
 func (r *NamespaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -180,4 +181,16 @@ func (r *NamespaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		//also reconcile when subnamespace is changed
 		Owns(&danav1alpha1.Subnamespace{}).
 		Complete(r)
+}
+
+func isRoot(namespace *corev1.Namespace) bool {
+	return namespace.Annotations[danav1alpha1.Role] == danav1alpha1.Root
+}
+
+func shouldCleanUp(namespace *corev1.Namespace) bool {
+	return !namespace.DeletionTimestamp.IsZero()
+}
+
+func shouldSync(namespace *corev1.Namespace) bool {
+	return controllerutil.ContainsFinalizer(namespace, danav1alpha1.NsFinalizer)
 }
