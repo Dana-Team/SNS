@@ -56,32 +56,32 @@ func (r *NamespaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	//get namespace instance
 	if err := r.Get(ctx, req.NamespacedName, &ns); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.V(2).Info("deleted")
+			log.V(3).Info("deleted")
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
-		log.Error(err, "unable to get Namespace")
+		log.V(4).Error(err, "unable to get Namespace")
 		return ctrl.Result{}, err
 	}
 
 	//we dont want to reconcile on root namespace since there is no need to init, sync or cleanup after them
 	//also we must not add finalizer to root namespace since we wont be able to be deleted
 	if isRoot(&ns) {
-		log.V(3).Info("is root, skip")
+		log.V(2).Info("is root, skip")
 		return ctrl.Result{}, nil
 	}
 
 	//ns is being deleted
 	if shouldCleanUp(&ns) {
-		log.V(3).Info("straing to clean up")
+		log.V(2).Info("straing to clean up")
 		return ctrl.Result{}, r.CleanUp(ctx, log, &ns)
 	}
 
 	if shouldSync(&ns) {
-		log.V(3).Info("straing to sync")
+		log.V(2).Info("straing to sync")
 		return ctrl.Result{}, r.Sync(ctx, log, &ns)
 	}
 
-	log.V(3).Info("straing to init")
+	log.V(2).Info("straing to init")
 	return ctrl.Result{}, r.Init(ctx, log, &ns)
 }
 
@@ -91,10 +91,10 @@ func (r *NamespaceReconciler) Init(ctx context.Context, log logr.Logger, namespa
 	controllerutil.AddFinalizer(namespace, danav1alpha1.NsFinalizer)
 	if err := r.Update(ctx, namespace); err != nil {
 		if apierrors.IsConflict(err) {
-			log.V(2).Info("newer resource version exists")
+			log.V(3).Info("newer resource version exists")
 			return nil
 		}
-		log.Error(err, "unable to update namespace")
+		log.V(4).Error(err, "unable to update namespace")
 		return err
 	}
 
@@ -118,16 +118,16 @@ func (r *NamespaceReconciler) Sync(ctx context.Context, log logr.Logger, namespa
 		role = danav1alpha1.Leaf
 	}
 
-	if namespace.Labels[danav1alpha1.Parent] == role {
+	if namespace.Labels[danav1alpha1.Role] == role {
 		return nil
 	}
 
 	namespace.Annotations[danav1alpha1.Role] = role
 	if err := r.Update(ctx, namespace); err != nil {
-		log.Error(err, "unable to update namespace")
+		log.V(4).Error(err, "unable to update namespace")
 		return err
 	}
-	log.V(2).Info("role updated")
+	log.V(3).Info("role updated")
 	return nil
 }
 
@@ -135,31 +135,23 @@ func (r *NamespaceReconciler) Sync(ctx context.Context, log logr.Logger, namespa
 //also removing the finalizer from the namespace so it could be deleted
 func (r *NamespaceReconciler) CleanUp(ctx context.Context, log logr.Logger, namespace *corev1.Namespace) error {
 
-	sns := danav1alpha1.Subnamespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      namespace.Annotations[danav1alpha1.SnsPointer],
-			Namespace: namespace.Labels[danav1alpha1.Parent],
-		},
-	}
-
+	sns := getSns(namespace)
 	if err := r.Delete(ctx, &sns); err != nil {
 		//We should treat the case when the Delete did not find the subnamespace we are trying to delete
 		//since we must make sure the finalizer is removed even though the subnamespace is missing
-		if apierrors.IsNotFound(err) {
-			goto removeFinalizer
+		if !apierrors.IsNotFound(err) {
+			log.V(4).Error(err, "unable to delete Subnamespace")
+			return err
 		}
-		log.Error(err, "unable to delete Subnamespace")
-		return err
 	}
 
-removeFinalizer:
 	controllerutil.RemoveFinalizer(namespace, danav1alpha1.NsFinalizer)
 	if err := r.Update(ctx, namespace); err != nil {
-		log.Error(err, "unable to update namespace")
+		log.V(4).Error(err, "unable to update namespace")
 		return err
 	}
 
-	log.V(2).Info("cleaned up")
+	log.V(3).Info("cleaned up")
 	return nil
 }
 
@@ -193,4 +185,13 @@ func shouldCleanUp(namespace *corev1.Namespace) bool {
 
 func shouldSync(namespace *corev1.Namespace) bool {
 	return controllerutil.ContainsFinalizer(namespace, danav1alpha1.NsFinalizer)
+}
+
+func getSns(namespace *corev1.Namespace) danav1alpha1.Subnamespace {
+	return danav1alpha1.Subnamespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      namespace.Annotations[danav1alpha1.SnsPointer],
+			Namespace: namespace.Labels[danav1alpha1.Parent],
+		},
+	}
 }
