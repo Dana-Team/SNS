@@ -18,17 +18,20 @@ package main
 
 import (
 	"flag"
+	"os"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	danav1alpha1 "github.com/Dana-Team/SNS/api/v1alpha1"
-	"github.com/Dana-Team/SNS/controllers"
+	"github.com/Dana-Team/SNS/internals/webhooks"
+
+	danav1alpha1 "github.com/Dana-Team/SNS/internals/api/v1alpha1"
+	"github.com/Dana-Team/SNS/internals/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -89,7 +92,7 @@ func main() {
 	hookServer := mgr.GetWebhookServer()
 
 	setupLog.Info("Registering webhooks to the webhook server")
-	hookServer.Register("/validate-v1-namespace", &webhook.Admission{Handler: &danav1alpha1.NamepsaceAnnotator{Client: mgr.GetClient()}})
+	hookServer.Register("/validate-v1-namespace", &webhook.Admission{Handler: &webhooks.NamepsaceAnnotator{Client: mgr.GetClient()}})
 
 	// +kubebuilder:scaffold:builder
 

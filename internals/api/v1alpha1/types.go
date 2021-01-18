@@ -1,6 +1,6 @@
 package v1alpha1
 
-type Phase string
+type Phase = string
 
 //Sns phases
 const (
