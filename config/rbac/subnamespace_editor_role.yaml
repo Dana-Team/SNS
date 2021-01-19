@@ -5,7 +5,7 @@ metadata:
   name: subnamespace-editor-role
 rules:
 - apiGroups:
-  - dana.github.com/Dana-Team/SNS
+  - dana.dana.hns.io
   resources:
   - subnamespaces
   verbs:
@@ -17,7 +17,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - dana.github.com/Dana-Team/SNS
+  - dana.dana.hns.io
   resources:
   - subnamespaces/status
   verbs:

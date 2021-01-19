@@ -26,9 +26,12 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	danav1alpha1 "github.com/Dana-Team/SNS/api/v1alpha1"
-	"github.com/Dana-Team/SNS/controllers"
+	"github.com/Dana-Team/SNS/internals/webhooks"
+
+	danav1alpha1 "github.com/Dana-Team/SNS/internals/api/v1alpha1"
+	"github.com/Dana-Team/SNS/internals/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -61,7 +64,7 @@ func main() {
 		MetricsBindAddress: metricsAddr,
 		Port:               9443,
 		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "c1382367.github.com/Dana-Team/SNS",
+		LeaderElectionID:   "c1382367.dana.hns.io",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -84,6 +87,13 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Subnamespace")
 		os.Exit(1)
 	}
+
+	setupLog.Info("setting up webhook server")
+	hookServer := mgr.GetWebhookServer()
+
+	setupLog.Info("Registering webhooks to the webhook server")
+	hookServer.Register("/validate-v1-namespace", &webhook.Admission{Handler: &webhooks.NamepsaceAnnotator{Client: mgr.GetClient()}})
+
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")

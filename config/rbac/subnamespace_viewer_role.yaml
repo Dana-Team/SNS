@@ -5,7 +5,7 @@ metadata:
   name: subnamespace-viewer-role
 rules:
 - apiGroups:
-  - dana.github.com/Dana-Team/SNS
+  - dana.dana.hns.io
   resources:
   - subnamespaces
   verbs:
@@ -13,7 +13,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - dana.github.com/Dana-Team/SNS
+  - dana.dana.hns.io
   resources:
   - subnamespaces/status
   verbs:
