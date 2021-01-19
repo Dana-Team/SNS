@@ -17,9 +17,7 @@ limitations under the License.
 package controllers
 
 import (
-	danav1alpha1 "github.com/Dana-Team/SNS/api/v1alpha1"
 	"path/filepath"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -30,6 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	danav1alpha1 "github.com/Dana-Team/SNS/internals/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -49,13 +51,13 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func(done Done) {
-	//logf.SetLogger(zap.LoggerTo(GinkgoWriter, true))
-	existingCluster := true
+	logf.SetLogger(zap.LoggerTo(GinkgoWriter, true))
+
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:  []string{filepath.Join("..", "config", "crd", "bases")},
-		UseExistingCluster: &existingCluster,
+		CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases")},
 	}
+
 	var err error
 	cfg, err = testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
@@ -69,36 +71,8 @@ var _ = BeforeSuite(func(done Done) {
 
 	// +kubebuilder:scaffold:scheme
 
-	//k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	//Expect(err).ToNot(HaveOccurred())
-	//Expect(k8sClient).ToNot(BeNil())
-
-	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme: scheme.Scheme,
-	})
+	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).ToNot(HaveOccurred())
-
-	err = (&NamespaceReconciler{
-		Client: k8sManager.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Namespace"),
-		Scheme: scheme.Scheme,
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&SubnamespaceReconciler{
-		Client: k8sManager.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("SubNamespace"),
-		Scheme: scheme.Scheme,
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	go func() {
-		err = k8sManager.Start(ctrl.SetupSignalHandler())
-		Expect(err).ToNot(HaveOccurred())
-	}()
-
-	k8sClient = k8sManager.GetClient()
-
 	Expect(k8sClient).ToNot(BeNil())
 
 	close(done)

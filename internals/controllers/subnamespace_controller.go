@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 
-	danav1alpha1 "github.com/Dana-Team/SNS/api/v1alpha1"
+	danav1alpha1 "github.com/Dana-Team/SNS/internals/api/v1alpha1"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
