@@ -1,6 +1,6 @@
 package webhooks
 
 const (
-	denyMessage  = "Delete non-leaf namespace is forbidden"
+	denyMessage  = "Deleting a Namespace with Subnamesapces is forbidden."
 	allowMessage = "Deleted successfully"
 )
