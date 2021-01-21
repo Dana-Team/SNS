@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 
-	"github.com/Dana-Team/SNS/internals/api/v1alpha1"
+	"github.com/Dana-Team/SNS/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"

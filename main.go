@@ -30,7 +30,7 @@ import (
 
 	"github.com/Dana-Team/SNS/internals/webhooks"
 
-	danav1alpha1 "github.com/Dana-Team/SNS/internals/api/v1alpha1"
+	danav1alpha1 "github.com/Dana-Team/SNS/api/v1alpha1"
 	"github.com/Dana-Team/SNS/internals/controllers"
 	// +kubebuilder:scaffold:imports
 )
