@@ -29,7 +29,7 @@ import (
 
 	danav1alpha1 "github.com/Dana-Team/SNS/api/v1alpha1"
 	rbacv1 "github.com/Dana-Team/SNS/api/v1alpha1"
-	"github.com/Dana-Team/SNS/controllers"
+	"github.com/Dana-Team/SNS/internals/controllers"
 	// +kubebuilder:scaffold:imports
 )
 

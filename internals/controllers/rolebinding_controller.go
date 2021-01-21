@@ -86,7 +86,7 @@ func (r *RoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	if shouldCleanUp(&rb) {
+	if shouldCleanUp2(&rb) {
 		log.Info("RB delete")
 		return ctrl.Result{}, r.DeleteRB(ctx, log, &rb, snsList)
 	}
@@ -188,7 +188,7 @@ func FinalizerCheck(rb *rbacv1.RoleBinding) bool {
 	return !controllerutil.ContainsFinalizer(rb, danav1alpha1.RbFinalizer)
 }
 
-func shouldCleanUp(rb *rbacv1.RoleBinding) bool {
+func shouldCleanUp2(rb *rbacv1.RoleBinding) bool {
 	return !rb.DeletionTimestamp.IsZero()
 }
 

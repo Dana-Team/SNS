@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1api "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 var (
@@ -60,7 +59,7 @@ var (
 
 	ChecksRb = rbacv1.RoleBinding{}
 
-	rootNs = v1.Namespace{
+	rootNs2 = v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: rootnsname,
 			Annotations: map[string]string{
@@ -77,12 +76,7 @@ var (
 	}
 )
 
-const (
-	timeout  = time.Second * 60
-	interval = time.Millisecond * 250
-)
-
-func containsFinalizer(finalizers []string) bool {
+func containsFinalizer2(finalizers []string) bool {
 	for _, finalizer := range finalizers {
 		if finalizer == v1alpha1.RbFinalizer {
 			return true
@@ -99,7 +93,7 @@ var _ = Describe("RoleBinding controller", func() {
 	Context("INIT", func() {
 		It("INIT", func() {
 			By("INIT")
-			Expect(k8sClient.Create(ctx, &rootNs)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, &rootNs2)).Should(Succeed())
 			Expect(k8sClient.Create(ctx, &SubNs)).Should(Succeed())
 		})
 	})
@@ -117,7 +111,7 @@ var _ = Describe("RoleBinding controller", func() {
 					return false
 				}
 
-				if !containsFinalizer(ChecksRb.Finalizers) {
+				if !containsFinalizer2(ChecksRb.Finalizers) {
 					fmt.Print("Finalizer Fail")
 					return false
 				}
@@ -147,7 +141,7 @@ var _ = Describe("RoleBinding controller", func() {
 	Context("Deleting the root namesapce", func() {
 		It("Deleting the root namesapce", func() {
 			By("Deleting the root namesapce")
-			Expect(k8sClient.Delete(ctx, &rootNs)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, &rootNs2)).Should(Succeed())
 
 		})
 	})
