@@ -60,7 +60,7 @@ func (r *NamespaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Error(err, "unable to get Namespace")
 		return ctrl.Result{}, err
 	}
-
+	//////////////////////////requeq exmaple //////////////////////////////
 	//ns is being deleted
 	if !ns.DeletionTimestamp.IsZero() {
 		shouldRequeue, err := r.CleanUp(ctx, log, &ns)
