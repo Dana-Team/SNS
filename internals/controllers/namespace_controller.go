@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	danav1alpha1 "github.com/Dana-Team/SNS/internals/api/v1alpha1"
+	danav1alpha1 "github.com/Dana-Team/SNS/api/v1alpha1"
 )
 
 // NamespaceReconciler reconciles a Namespace object
