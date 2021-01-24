@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 
+	qoutav1 "github.com/openshift/api/quota/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -156,6 +157,17 @@ func (r *NamespaceReconciler) Sync(ctx context.Context, log logr.Logger, namespa
 //also removing the finalizer from the namespace so it could be deleted
 func (r *NamespaceReconciler) CleanUp(ctx context.Context, log logr.Logger, namespace *corev1.Namespace) error {
 
+	//delete crq
+	crq := getCrq(namespace)
+	if err := r.Delete(ctx, &crq); err != nil {
+		//We should treat the case when the Delete did not find the crq we are trying to delete
+		//since we must make sure the finalizer is removed even though the crq is missing
+		if !apierrors.IsNotFound(err) {
+			log.V(4).Error(err, "unable to delete cluster resource quota")
+			return err
+		}
+	}
+	//delete the sns object from parent ns
 	sns := getSns(namespace)
 	if err := r.Delete(ctx, &sns); err != nil {
 		//We should treat the case when the Delete did not find the subnamespace we are trying to delete
@@ -165,7 +177,7 @@ func (r *NamespaceReconciler) CleanUp(ctx context.Context, log logr.Logger, name
 			return err
 		}
 	}
-
+	//remove finalizer so the ns will be able to delete
 	controllerutil.RemoveFinalizer(namespace, danav1alpha1.NsFinalizer)
 	if err := r.Update(ctx, namespace); err != nil {
 		log.V(4).Error(err, "unable to update namespace")
@@ -206,6 +218,12 @@ func shouldCleanUp(namespace *corev1.Namespace) bool {
 
 func shouldSync(namespace *corev1.Namespace) bool {
 	return controllerutil.ContainsFinalizer(namespace, danav1alpha1.NsFinalizer)
+}
+
+func getCrq(namespace *corev1.Namespace) qoutav1.ClusterResourceQuota {
+	return qoutav1.ClusterResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: namespace.Name},
+	}
 }
 
 func getSns(namespace *corev1.Namespace) danav1alpha1.Subnamespace {
