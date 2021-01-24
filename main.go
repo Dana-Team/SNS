@@ -18,7 +18,9 @@ package main
 
 import (
 	"flag"
+	"github.com/Dana-Team/SNS/internals/webhooks"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -94,6 +96,13 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "RoleBinding")
 		os.Exit(1)
 	}
+
+	setupLog.Info("setting up webhook server")
+	hookServer := mgr.GetWebhookServer()
+
+	setupLog.Info("Registering webhooks to the webhook server")
+	hookServer.Register("/validate-v1-namespace", &webhook.Admission{Handler: &webhooks.NamepsaceAnnotator{Client: mgr.GetClient()}})
+
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")
