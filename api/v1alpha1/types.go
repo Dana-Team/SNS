@@ -35,4 +35,5 @@ const (
 //Finalizers
 const (
 	NsFinalizer = MetaGroup + "delete-sns"
+	RbFinalizer = MetaGroup + "delete-rb"
 )
