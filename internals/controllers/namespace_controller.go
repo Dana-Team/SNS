@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"github.com/go-logr/logr"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 
@@ -88,6 +89,9 @@ func (r *NamespaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 //Init is being called at the first time namesapce is be reconciled and adds a finalizer to it
 func (r *NamespaceReconciler) Init(ctx context.Context, log logr.Logger, namespace *corev1.Namespace) error {
 
+	var rbList rbacv1.RoleBindingList
+
+	//we add finalizer to a ns so we could delete the sns object from the parent ns while deleting
 	controllerutil.AddFinalizer(namespace, danav1alpha1.NsFinalizer)
 	if err := r.Update(ctx, namespace); err != nil {
 		if apierrors.IsConflict(err) {
@@ -96,6 +100,23 @@ func (r *NamespaceReconciler) Init(ctx context.Context, log logr.Logger, namespa
 		}
 		log.V(4).Error(err, "unable to update namespace")
 		return err
+	}
+
+	//list all parent role bindings
+	if err := r.List(ctx, &rbList, client.InNamespace(namespace.Labels[danav1alpha1.Parent])); err != nil {
+		log.V(4).Error(err, "unable to list role bindings")
+
+	}
+	//create all role bindings in the new namespace
+	for _, rb := range rbList.Items {
+		//TODO we should create an indexer for rb kind
+		if rb.Subjects[0].Kind == "User" {
+			rbToCreate := composeRbs(&rb, namespace)
+			if err := r.Create(ctx, &rbToCreate); err != nil {
+				log.V(4).Error(err, "unable to create role bindings")
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -193,5 +214,16 @@ func getSns(namespace *corev1.Namespace) danav1alpha1.Subnamespace {
 			Name:      namespace.Annotations[danav1alpha1.SnsPointer],
 			Namespace: namespace.Labels[danav1alpha1.Parent],
 		},
+	}
+}
+
+func composeRbs(rb *rbacv1.RoleBinding, namespace *corev1.Namespace) rbacv1.RoleBinding {
+	return rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rb.Name,
+			Namespace: namespace.Name,
+		},
+		Subjects: rb.Subjects,
+		RoleRef:  rb.RoleRef,
 	}
 }
