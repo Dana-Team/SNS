@@ -2,57 +2,62 @@ apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
   creationTimestamp: null
-  name: namespace-template-new
+  name: createnamesapcewolt
+  metadata:
+    annotations:
+      openshift.io/display-name: "Create namesacpe - Wolt"
 objects:
 - apiVersion: v1
   kind: Namespace
   metadata:
     annotations:
-      openshift.io/description: ${NS_DESCRIPTION}
-      openshift.io/display-name: ${NS_NAME}
+      openshift.io/description: ${Description}
+      openshift.io/display-name: ${Namespace}
       dana.hns.io/role: root
     creationTimestamp: null
-    name: ${NS_NAME}
+    name: ${Namespace}
     labels:
       danav1alpha1.Hns: "True"
-      namespace: ${NS_NAME}
+      namespace: ${Namespace}
   spec: {}
   status: {}
 - apiVersion: quota.openshift.io/v1
   kind: ClusterResourceQuota
   metadata:
-    name: "${NS_NAME}clusterquota"
+    name: "${Namespace}"
   spec:
     quota:
        hard:
-         cpu: ${CPU_QUOTA}
-         memory: ${MEM_QUOTA}
+         cpu: ${CpuQuota}
+         memory: ${MemQuota}
     selector:
       labels:
         matchLabels:
-                namespace: ${NS_NAME}
+                namespace: ${Namespace}
   status: {}
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
     annotations: {}
-    name: "${NS_NAME}_admin"
-    namespace: ${NS_NAME}
+    name: "${Namespace}"
+    namespace: ${Namespace}
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: ClusterRole
     name: admin
   subjects:
   - kind: User
-    name: "${ADMIN_USER}"
-    namespace: ${NS_NAME}
+    name: "${AdminUser}"
+    namespace: ${Namespace}
 parameters:
-- name: NS_NAME
+- name: Namespace
   from: '[\d]{10}'
-- name: NS_DESCRIPTION
-- name: CPU_QUOTA
+  description: Enter namespace name
+- name: Description
+  description: Enter namesapce Description
+- name: CpuQuota
   description: Enter cpu cores quota to project
-- name: MEM_QUOTA
-  description: Enter mem quota to project (GB)
-- name: ADMIN_USER
+- name: MemQuota
+  description: Enter mem quota to project (GB)MemQuota
+- name: AdminUser
   description: Enter openshift user name that will add as admin to the project
