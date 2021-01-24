@@ -48,21 +48,11 @@ func (r *RoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	var (
 		rb      rbacv1.RoleBinding
 		ns      corev1.Namespace
-		kind    string
-		snsList danav1alpha1.SubnamespaceList
+		SnsList danav1alpha1.SubnamespaceList
+		IsHns   string
 		//ishns string
 	)
-	// get namespace name to ns
-	if err := r.Get(ctx, client.ObjectKey{Namespace: "", Name: req.Namespace}, &ns); err != nil {
-		log.V(2).Error(err, "Could not find  namespace ")
-		return ctrl.Result{}, err
-	}
-	/*
-		ishns = ns.ObjectMeta.Labels[danav1alpha1.Hns]
-		if ishns == ""{
-			return  ctrl.Result{}, nil
-		}
-	*/
+
 	// get the rb
 	if err := r.Get(ctx, req.NamespacedName, &rb); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -71,20 +61,30 @@ func (r *RoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		log.V(2).Error(err, "unable to get rb")
 		return ctrl.Result{}, err
 	}
-	//create a subnamespaces list
-	if err := r.List(ctx, &snsList, client.InNamespace(ns.Name)); err != nil {
+
+	// get namespace name to ns
+	if err := r.Get(ctx, client.ObjectKey{Namespace: "", Name: req.Namespace}, &ns); err != nil {
+		log.V(2).Error(err, "Could not find  namespace ")
 		return ctrl.Result{}, err
 	}
 
-	kind = rb.Subjects[0].Kind
+	IsHns = ns.ObjectMeta.Labels[danav1alpha1.Hns]
+	if IsHns == "" {
+		return ctrl.Result{}, nil
+	}
 
-	if kind != "User" {
+	//create a subnamespaces list
+	if err := r.List(ctx, &SnsList, client.InNamespace(ns.Name)); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if rb.Subjects[0].Kind != "User" {
 		return ctrl.Result{}, nil
 	}
 
 	if ShouldCleanUp(&rb) {
-		log.V(2).Info("RB delete")
-		return ctrl.Result{}, r.rbDelete(ctx, log, &rb, snsList)
+		log.V(2).Info("rb delete")
+		return ctrl.Result{}, r.rbDelete(ctx, log, &rb, &SnsList)
 	}
 
 	if FinalizerCheck(&rb) {
@@ -92,23 +92,19 @@ func (r *RoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	}
 	//if the recocile is not for deleting and dont have finzilizer , lets create it
-	log.V(2).Info("RB CREATE WILL START ")
-	if err := r.rbCreate(ctx, log, &rb, snsList); err != nil {
+	if err := r.rbCreate(ctx, log, &rb, &SnsList); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *RoleBindingReconciler) rbDelete(ctx context.Context, log logr.Logger, rb *rbacv1.RoleBinding, snsList danav1alpha1.SubnamespaceList) error {
-	var (
-		rbToDelete    rbacv1.RoleBinding
-		namespacename string
-	)
+func (r *RoleBindingReconciler) rbDelete(ctx context.Context, log logr.Logger, rb *rbacv1.RoleBinding, snsList *danav1alpha1.SubnamespaceList) error {
+	var RbToDelete rbacv1.RoleBinding
+
 	for _, sns := range snsList.Items {
-		namespacename = sns.ObjectMeta.Annotations[danav1alpha1.Pointer]
-		rbToDelete = buildRbs(rb, namespacename)
-		if err := r.Delete(ctx, &rbToDelete); err != nil {
+		RbToDelete = buildRbs(rb, sns)
+		if err := r.Delete(ctx, &RbToDelete); err != nil {
 			if !apierrors.IsNotFound(err) {
 				log.V(2).Error(err, "unable to delete rolebinding")
 				return err
@@ -125,28 +121,28 @@ func (r *RoleBindingReconciler) rbDelete(ctx context.Context, log logr.Logger, r
 
 }
 
-func (r *RoleBindingReconciler) rbCreate(ctx context.Context, log logr.Logger, rb *rbacv1.RoleBinding, snsList danav1alpha1.SubnamespaceList) error {
+func (r *RoleBindingReconciler) rbCreate(ctx context.Context, log logr.Logger, rb *rbacv1.RoleBinding, snsList *danav1alpha1.SubnamespaceList) error {
 	var (
-		rbToCreate    rbacv1.RoleBinding
-		namespacename string
+		RbToCreate    rbacv1.RoleBinding
+		NamespaceName string
 	)
 
 	//create the rb
 	for _, sns := range snsList.Items {
-		namespacename = sns.ObjectMeta.Annotations[danav1alpha1.Pointer]
-		if err := r.Get(ctx, client.ObjectKey{Namespace: namespacename, Name: rb.Name}, &rbToCreate); err != nil {
+		NamespaceName = sns.ObjectMeta.Annotations[danav1alpha1.Pointer]
+		if err := r.Get(ctx, client.ObjectKey{Namespace: NamespaceName, Name: rb.Name}, &RbToCreate); err != nil {
 			if !apierrors.IsNotFound(err) {
 				log.V(3).Info("resource already exist")
 				return err
 			}
 		}
-		if rbToCreate.Name != "" {
+		if RbToCreate.Name != "" {
 			continue
 		}
-		rbToCreate = buildRbs(rb, namespacename)
-		if err := r.Create(ctx, &rbToCreate); err != nil {
+		RbToCreate = buildRbs(rb, sns)
+		if err := r.Create(ctx, &RbToCreate); err != nil {
 			if !apierrors.IsConflict(err) {
-				log.V(2).Error(err, "unable to Create rolebinding")
+				log.V(2).Error(err, "unable to create rolebinding")
 				return err
 			}
 		}
@@ -157,11 +153,13 @@ func (r *RoleBindingReconciler) rbCreate(ctx context.Context, log logr.Logger, r
 }
 
 //build rb object
-func buildRbs(rb *rbacv1.RoleBinding, namespace string) rbacv1.RoleBinding {
+func buildRbs(rb *rbacv1.RoleBinding, sns danav1alpha1.Subnamespace) rbacv1.RoleBinding {
+	var NamespaceName string
+	NamespaceName = sns.ObjectMeta.Annotations[danav1alpha1.Pointer]
 	return rbacv1.RoleBinding{
 		ObjectMeta: v1api.ObjectMeta{
 			Name:      rb.Name,
-			Namespace: namespace,
+			Namespace: NamespaceName,
 		},
 		Subjects: rb.Subjects,
 		RoleRef:  rb.RoleRef,

@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"github.com/Dana-Team/SNS/api/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -88,11 +87,9 @@ func containsFinalizer2(finalizers []string) bool {
 var _ = Describe("RoleBinding controller", func() {
 	ctx := context.Background()
 
-	fmt.Print("\n Crating new root namespace: ", rootnsname, "\n")
-
-	Context("INIT", func() {
-		It("INIT", func() {
-			By("INIT")
+	Context("init root ns and subns", func() {
+		It("init root ns and subns", func() {
+			By("creating ns and subns")
 			Expect(k8sClient.Create(ctx, &rootNs2)).Should(Succeed())
 			Expect(k8sClient.Create(ctx, &SubNs)).Should(Succeed())
 		})
@@ -106,16 +103,13 @@ var _ = Describe("RoleBinding controller", func() {
 			//Eventually
 			Eventually(func() bool {
 				if err := k8sClient.Get(ctx, client.ObjectKey{Namespace: SubRb.Subjects[0].Namespace, Name: SubRb.Subjects[0].Name}, &ChecksRb); err != nil {
-					fmt.Print("Get Fail")
 
 					return false
 				}
 
 				if !containsFinalizer2(ChecksRb.Finalizers) {
-					fmt.Print("Finalizer Fail")
 					return false
 				}
-				fmt.Print("ALl Passed ")
 				return true
 
 			}, timeout, interval).Should(BeTrue())
@@ -136,7 +130,6 @@ var _ = Describe("RoleBinding controller", func() {
 			}, timeout, interval).Should(BeTrue())
 		})
 	})
-	fmt.Print("\n Deleting new root namespace", rootnsname, "\n")
 
 	Context("Deleting the root namesapce", func() {
 		It("Deleting the root namesapce", func() {
