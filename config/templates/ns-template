@@ -1,0 +1,58 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  creationTimestamp: null
+  name: namespace-template-new
+objects:
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    annotations:
+      openshift.io/description: ${NS_DESCRIPTION}
+      openshift.io/display-name: ${NS_NAME}
+      dana.hns.io/role: root
+    creationTimestamp: null
+    name: ${NS_NAME}
+    labels:
+      danav1alpha1.Hns: "True"
+      namespace: ${NS_NAME}
+  spec: {}
+  status: {}
+- apiVersion: quota.openshift.io/v1
+  kind: ClusterResourceQuota
+  metadata:
+    name: "${NS_NAME}clusterquota"
+  spec:
+    quota:
+       hard:
+         cpu: ${CPU_QUOTA}
+         memory: ${MEM_QUOTA}
+    selector:
+      labels:
+        matchLabels:
+                namespace: ${NS_NAME}
+  status: {}
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    annotations: {}
+    name: "${NS_NAME}_admin"
+    namespace: ${NS_NAME}
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: admin
+  subjects:
+  - kind: User
+    name: "${ADMIN_USER}"
+    namespace: ${NS_NAME}
+parameters:
+- name: NS_NAME
+  from: '[\d]{10}'
+- name: NS_DESCRIPTION
+- name: CPU_QUOTA
+  description: Enter cpu cores quota to project
+- name: MEM_QUOTA
+  description: Enter mem quota to project (GB)
+- name: ADMIN_USER
+  description: Enter openshift user name that will add as admin to the project

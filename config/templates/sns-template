@@ -1,0 +1,15 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: subnamespace-template
+objects:
+- apiVersion: dana.dana.hns.io/v1alpha1
+  kind: Subnamespace
+  metadata:
+     annotations: {}
+     name: "${SUB_NS_NAME}"
+  spec: {}
+  status: {}
+parameters:
+- name: SUB_NS_NAME
+  description: Enter your namespace name
