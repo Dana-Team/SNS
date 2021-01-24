@@ -21,6 +21,7 @@ import (
 	//"strconv"
 	"context"
 	danav1alpha1 "github.com/Dana-Team/SNS/api/v1alpha1"
+	"github.com/Dana-Team/SNS/internals/webhooks"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -30,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // RoleBindingReconciler reconciles a RoleBinding object
@@ -49,7 +51,7 @@ func (r *RoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		rb      rbacv1.RoleBinding
 		ns      corev1.Namespace
 		SnsList danav1alpha1.SubnamespaceList
-		IsHns   string
+		//IsHns   string
 		//ishns string
 	)
 
@@ -67,12 +69,12 @@ func (r *RoleBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		log.V(2).Error(err, "Could not find  namespace ")
 		return ctrl.Result{}, err
 	}
-
-	IsHns = ns.ObjectMeta.Labels[danav1alpha1.Hns]
-	if IsHns == "" {
-		return ctrl.Result{}, nil
-	}
-
+	/*
+		IsHns = ns.ObjectMeta.Labels[danav1alpha1.Hns]
+		if IsHns == "" {
+			return ctrl.Result{}, nil
+		}
+	*/
 	//create a subnamespaces list
 	if err := r.List(ctx, &SnsList, client.InNamespace(ns.Name)); err != nil {
 		return ctrl.Result{}, err
