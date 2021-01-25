@@ -50,16 +50,16 @@ func (r *SubnamespaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		subspace       danav1alpha1.Subnamespace
 	)
 
-	log.Info("starting to reconcile")
+	log.V(1).V(1).Info("starting to reconcile")
 
 	// Getting reconciled subspace
 	if err := r.Get(ctx, req.NamespacedName, &subspace); err != nil {
-		log.Info("Subspace deleted")
+		log.V(1).Info("Subspace deleted")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	// Getting subspace's namespace - described as ownerNamespace
 	if err := r.Get(ctx, client.ObjectKey{Namespace: "", Name: subspace.GetNamespace()}, &ownerNamespace); err != nil {
-		log.Error(err, "Could not find owner Namespace ")
+		log.V(2).Error(err, "Could not find owner Namespace ")
 		return ctrl.Result{}, err
 	}
 
@@ -73,7 +73,7 @@ func (r *SubnamespaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if err := r.InitSubspace(ctx, log, &ownerNamespace, &subspace, childNamespaceName); err != nil {
 			return ctrl.Result{}, err
 		}
-		log.Info("Subspace inited")
+		log.V(1).Info("Subspace inited")
 		return ctrl.Result{}, nil
 
 	case danav1alpha1.Missing:
@@ -87,7 +87,7 @@ func (r *SubnamespaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			if err := r.CreateNamespace(ctx, log, &ownerNamespace, &subspace); err != nil {
 				return ctrl.Result{}, err
 			}
-			log.Info("child namespace created, requeue")
+			log.V(1).Info("child namespace created, requeue")
 			return ctrl.Result{Requeue: true}, nil
 		} else {
 			// Namespace exist, now checking CRQ existence
@@ -105,7 +105,7 @@ func (r *SubnamespaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			if err := r.UpdateSubspacePhase(ctx, log, &subspace, danav1alpha1.Created); err != nil {
 				return ctrl.Result{}, err
 			}
-			log.Info("subnamespace phase updated from Missing to Created")
+			log.V(1).Info("subnamespace phase updated from Missing to Created")
 			return ctrl.Result{}, nil
 		}
 
@@ -119,7 +119,7 @@ func (r *SubnamespaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	default:
 
 		err := errors.New("unexpected subnamespace phase")
-		log.Error(err, "unexpected subnamespace phase")
+		log.V(1).Error(err, "unexpected subnamespace phase")
 		return ctrl.Result{}, err
 
 	}
@@ -131,7 +131,7 @@ func (r *SubnamespaceReconciler) IsObjectMissing(ctx context.Context, log logr.L
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		} else {
-			log.Error(err, "Could not get child namespace")
+			log.V(2).Error(err, "Could not get child namespace")
 			return false, err
 		}
 	}
@@ -210,7 +210,7 @@ func (r *SubnamespaceReconciler) CreateNamespace(ctx context.Context, log logr.L
 	if _, err := ctrl.CreateOrUpdate(ctx, r.Client, &childNamespace, func() error {
 		return nil
 	}); err != nil {
-		log.Error(err, "Could not create child namespace")
+		log.V(2).Error(err, "Could not create child namespace")
 		return err
 	}
 	return nil
@@ -222,7 +222,7 @@ func (r *SubnamespaceReconciler) CreateCRQ(ctx context.Context, log logr.Logger,
 	if _, err := ctrl.CreateOrUpdate(ctx, r.Client, &childCRQ, func() error {
 		return nil
 	}); err != nil {
-		log.Error(err, "Could not create child namespace")
+		log.V(2).Error(err, "Could not create child namespace")
 		return err
 	}
 	return nil
@@ -231,12 +231,12 @@ func (r *SubnamespaceReconciler) CreateCRQ(ctx context.Context, log logr.Logger,
 
 func (r *SubnamespaceReconciler) UpdateCRQ(ctx context.Context, log logr.Logger, crqToUpdate *openshiftv1.ClusterResourceQuota, subspace *danav1alpha1.Subnamespace, crqName string) error {
 	if err := r.Get(ctx, client.ObjectKey{Name: crqName}, crqToUpdate); err != nil {
-		log.Error(err, "Could not find CRQ")
+		log.V(2).Error(err, "Could not find CRQ")
 		return err
 	}
 	crqToUpdate.Spec.Quota = subspace.Spec.ResourceQuotaSpec
 	if err := r.Update(ctx, crqToUpdate); err != nil {
-		log.Error(err, "Could not update CRQ")
+		log.V(2).Error(err, "Could not update CRQ")
 		return err
 	}
 	return nil
@@ -254,10 +254,10 @@ func (r *SubnamespaceReconciler) InitSubspace(ctx context.Context, log logr.Logg
 		return nil
 	}); err != nil {
 		if !apierrors.IsConflict(err) {
-			log.Error(err, "Could not update Subspace Phase from 'None' to 'Missing'")
+			log.V(2).Error(err, "Could not update Subspace Phase from 'None' to 'Missing'")
 			return err
 		}
-		log.Info("newer resource version exists")
+		log.V(2).Info("newer resource version exists")
 	}
 	return nil
 
@@ -278,10 +278,10 @@ func (r *SubnamespaceReconciler) UpdateSubspacePhase(ctx context.Context, log lo
 		return nil
 	}); err != nil {
 		if !apierrors.IsConflict(err) {
-			log.Error(err, "Could not update Subspace Phase from 'Missing' to 'Created'")
+			log.V(2).Error(err, "Could not update Subspace Phase from 'Missing' to 'Created'")
 			return err
 		}
-		log.Info("newer resource version exists")
+		log.V(2).Info("newer resource version exists")
 	}
 	return nil
 }
