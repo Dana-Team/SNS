@@ -149,6 +149,7 @@ func (r *NamespaceReconciler) Sync(ctx context.Context, log logr.Logger, namespa
 		log.V(4).Error(err, "unable to update namespace")
 		return err
 	}
+
 	log.V(3).Info("role updated")
 	return nil
 }
@@ -180,8 +181,13 @@ func (r *NamespaceReconciler) CleanUp(ctx context.Context, log logr.Logger, name
 	//remove finalizer so the ns will be able to delete
 	controllerutil.RemoveFinalizer(namespace, danav1alpha1.NsFinalizer)
 	if err := r.Update(ctx, namespace); err != nil {
-		log.V(4).Error(err, "unable to update namespace")
-		return err
+		//since there is more the one controller reconciling
+		if !apierrors.IsConflict(err) {
+			log.V(4).Error(err, "unable to remove finalizer")
+			return err
+		}
+		log.V(3).Info("newer resource version exists")
+		return nil
 	}
 
 	log.V(3).Info("cleaned up")

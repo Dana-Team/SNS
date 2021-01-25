@@ -13,6 +13,8 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
+	qoutav1 "github.com/openshift/api/quota/v1"
 	"path/filepath"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"testing"
@@ -37,6 +39,12 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 
+var (
+	rootNs  = composeRootNs()
+	rootRb  = composeRootRb(&rootNs)
+	rootCrq = composeRootCrq(&rootNs)
+)
+
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
@@ -47,6 +55,7 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func(done Done) {
 	//logf.SetLogger(zap.LoggerTo(GinkgoWriter, true))
+	ctx := context.Background()
 	existingCluster := true
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
@@ -67,11 +76,10 @@ var _ = BeforeSuite(func(done Done) {
 	err = rbacv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	// +kubebuilder:scaffold:scheme
+	err = qoutav1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 
-	//k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	//Expect(err).ToNot(HaveOccurred())
-	//Expect(k8sClient).ToNot(BeNil())
+	// +kubebuilder:scaffold:scheme
 
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme.Scheme,
@@ -108,11 +116,21 @@ var _ = BeforeSuite(func(done Done) {
 
 	Expect(k8sClient).ToNot(BeNil())
 
+	Expect(k8sClient.Create(ctx, &rootNs)).Should(Succeed())
+	Expect(k8sClient.Create(ctx, &rootRb)).Should(Succeed())
+	Expect(k8sClient.Create(ctx, &rootCrq)).Should(Succeed())
+
 	close(done)
 }, 120)
 
 var _ = AfterSuite(func() {
+	ctx := context.Background()
 	By("tearing down the test environment")
+
+	Expect(k8sClient.Delete(ctx, &rootNs)).Should(Succeed())
+	Expect(k8sClient.Delete(ctx, &rootRb)).Should(Succeed())
+	Expect(k8sClient.Delete(ctx, &rootCrq)).Should(Succeed())
+
 	err := testEnv.Stop()
 	Expect(err).ToNot(HaveOccurred())
 })
