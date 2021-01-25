@@ -1,5 +1,7 @@
 apiVersion: template.openshift.io/v1
 kind: Template
+  annotations:
+    openshift.io/display-name: "Create namesacpe - Client (sns)"
 metadata:
   name: subnamespace-template
 objects:
@@ -7,9 +9,9 @@ objects:
   kind: Subnamespace
   metadata:
      annotations: {}
-     name: "${SUB_NS_NAME}"
+     name: "${Namespace}"
   spec: {}
   status: {}
 parameters:
-- name: SUB_NS_NAME
+- name: Namespace
   description: Enter your namespace name

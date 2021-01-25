@@ -3,9 +3,8 @@ kind: Template
 metadata:
   creationTimestamp: null
   name: createnamesapcewolt
-  metadata:
-    annotations:
-      openshift.io/display-name: "Create namesacpe - Wolt"
+  annotations:
+    openshift.io/display-name: "Create namesacpe - Wolt"
 objects:
 - apiVersion: v1
   kind: Namespace
