@@ -46,3 +46,23 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - rbac.dana.sns.io
+  resources:
+  - rolebindings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rbac.dana.sns.io
+  resources:
+  - rolebindings/status
+  verbs:
+  - get
+  - patch
+  - update
