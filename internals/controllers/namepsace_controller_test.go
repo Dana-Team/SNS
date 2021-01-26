@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"github.com/Dana-Team/SNS/api/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -18,10 +17,6 @@ var (
 )
 
 var _ = Describe("Namespace controller", func() {
-	fmt.Println(childSns.Name, childSns.Namespace)
-	fmt.Println(childNs.Name)
-	fmt.Println(grandChildSns.Name, grandChildSns.Namespace)
-	fmt.Println(grandChildNs.Name)
 	ctx := context.Background()
 
 	Context("Namespace Init", func() {
