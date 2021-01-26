@@ -26,10 +26,11 @@ const (
 
 //Annotations
 const (
-	Role       = MetaGroup + "role"
-	Depth      = MetaGroup + "depth"
-	Pointer    = MetaGroup + "pointer"
-	SnsPointer = MetaGroup + "sns-pointer"
+	Role        = MetaGroup + "role"
+	Depth       = MetaGroup + "depth"
+	CrqSelector = MetaGroup + "crq-selector"
+	Pointer     = MetaGroup + "pointer"
+	SnsPointer  = MetaGroup + "sns-pointer"
 )
 
 //Finalizers
