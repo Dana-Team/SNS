@@ -18,7 +18,8 @@ package main
 
 import (
 	"flag"
-	"github.com/Dana-Team/SNS/internals/webhooks"
+	danav1alpha1 "github.com/Dana-Team/SNS/api/v1alpha1"
+	"github.com/Dana-Team/SNS/internals/controllers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -26,11 +27,6 @@ import (
 	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
-
-	danav1alpha1 "github.com/Dana-Team/SNS/api/v1alpha1"
-	rbacv1 "github.com/Dana-Team/SNS/api/v1alpha1"
-	"github.com/Dana-Team/SNS/internals/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -44,7 +40,6 @@ func init() {
 
 	_ = corev1.AddToScheme(scheme)
 	_ = danav1alpha1.AddToScheme(scheme)
-	_ = rbacv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -87,20 +82,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Subnamespace")
 		os.Exit(1)
 	}
-	if err = (&controllers.RoleBindingReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("RoleBinding"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "RoleBinding")
-		os.Exit(1)
-	}
 
-	setupLog.Info("setting up webhook server")
-	hookServer := mgr.GetWebhookServer()
-
-	setupLog.Info("Registering webhooks to the webhook server")
-	hookServer.Register("/validate-v1-namespace", &webhook.Admission{Handler: &webhooks.NamepsaceAnnotator{Client: mgr.GetClient()}})
+	//setupLog.Info("setting up webhook server")
+	//hookServer := mgr.GetWebhookServer()
+	//
+	//setupLog.Info("Registering webhooks to the webhook server")
+	//hookServer.Register("/validate-v1-namespace", &webhook.Admission{Handler: &webhooks.NamepsaceAnnotator{Client: mgr.GetClient()}})
 
 	// +kubebuilder:scaffold:builder
 
