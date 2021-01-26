@@ -50,7 +50,7 @@ func (r *SubnamespaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		subspace       danav1alpha1.Subnamespace
 	)
 
-	log.V(1).V(1).Info("starting to reconcile")
+	log.V(1).Info("starting to reconcile")
 
 	// Getting reconciled subspace
 	if err := r.Get(ctx, req.NamespacedName, &subspace); err != nil {
@@ -66,7 +66,7 @@ func (r *SubnamespaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Hierarchy 'breadcrumb' name, built from ownerNamespace and subspace.
 	childNamespaceName := GetChildNamespaceName(&ownerNamespace, &subspace)
 
-	// current subspace's phase flow
+	// subspace's phase flow
 	switch currentPhase := subspace.Status.Phase; currentPhase {
 	case danav1alpha1.None:
 
@@ -77,29 +77,11 @@ func (r *SubnamespaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 
 	case danav1alpha1.Missing:
-		shouldCreateChildNs, err := r.IsObjectMissing(ctx, log, &v1.Namespace{}, "", childNamespaceName)
-		if err != nil {
+		if err := r.CreateNamespaceIfMissing(ctx, log, &ownerNamespace, &subspace); err != nil {
 			return ctrl.Result{}, err
 		}
-
-		if shouldCreateChildNs {
-			// Namespace not exist, creating it
-			if err := r.CreateNamespace(ctx, log, &ownerNamespace, &subspace); err != nil {
-				return ctrl.Result{}, err
-			}
-			log.V(1).Info("child namespace created")
-		}
-		// Namespace exist, now checking CRQ existence
-		shouldCreateCRQ, err := r.IsObjectMissing(ctx, log, &openshiftv1.ClusterResourceQuota{}, "", childNamespaceName)
-		if err != nil {
+		if err := r.CreateCRQIfMissing(ctx, log, &ownerNamespace, &subspace); err != nil {
 			return ctrl.Result{}, err
-		}
-
-		if shouldCreateCRQ {
-			// CRQ not exist, creating it
-			if err := r.CreateCRQ(ctx, log, &ownerNamespace, &subspace); err != nil {
-				return ctrl.Result{}, err
-			}
 		}
 		if err := r.UpdateSubspacePhase(ctx, log, &subspace, danav1alpha1.Created); err != nil {
 			return ctrl.Result{}, err
@@ -134,6 +116,94 @@ func (r *SubnamespaceReconciler) IsObjectMissing(ctx context.Context, log logr.L
 		}
 	}
 	return false, nil
+}
+
+func (r *SubnamespaceReconciler) CreateNamespaceIfMissing(ctx context.Context, log logr.Logger, ownerNamespace *v1.Namespace, subspace *danav1alpha1.Subnamespace) error {
+	var childNamespace = GetNewChildNamespace(ownerNamespace, subspace)
+	shouldCreateChildNs, err := r.IsObjectMissing(ctx, log, &v1.Namespace{}, "", childNamespace.Name)
+	if err != nil {
+		return err
+	}
+	// if Namespace doesn't exist, creating it
+	if shouldCreateChildNs {
+		if err := r.Create(ctx, &childNamespace); err != nil {
+			log.V(2).Error(err, "Could not create child namespace")
+			return err
+		}
+	}
+	log.V(1).Info("child namespace created")
+
+	return nil
+
+}
+
+func (r *SubnamespaceReconciler) CreateCRQIfMissing(ctx context.Context, log logr.Logger, ownerNamespace *v1.Namespace, subspace *danav1alpha1.Subnamespace) error {
+	childCRQ := GetNewChildCRQ(ownerNamespace, subspace)
+	shouldCreateCRQ, err := r.IsObjectMissing(ctx, log, &openshiftv1.ClusterResourceQuota{}, "", childCRQ.Name)
+	if err != nil {
+		return err
+	}
+
+	// CRQ not exist, creating it
+	if shouldCreateCRQ {
+		if err := r.Create(ctx, &childCRQ); err != nil {
+			log.V(2).Error(err, "Could not create child namespace")
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *SubnamespaceReconciler) UpdateCRQ(ctx context.Context, log logr.Logger, crqToUpdate *openshiftv1.ClusterResourceQuota, subspace *danav1alpha1.Subnamespace, crqName string) error {
+	if err := r.Get(ctx, client.ObjectKey{Name: crqName}, crqToUpdate); err != nil {
+		log.V(2).Error(err, "Could not find CRQ")
+		return err
+	}
+	crqToUpdate.Spec.Quota = subspace.Spec.ResourceQuotaSpec
+	if err := r.Update(ctx, crqToUpdate); err != nil {
+		log.V(2).Error(err, "Could not update CRQ")
+		return err
+	}
+	return nil
+}
+
+func (r *SubnamespaceReconciler) InitSubspace(ctx context.Context, log logr.Logger, ownerNamespace *v1.Namespace, subspace *danav1alpha1.Subnamespace, childNamespaceName string) error {
+	subspace.SetAnnotations(map[string]string{danav1alpha1.Pointer: childNamespaceName})
+	subspace.Status.Phase = danav1alpha1.Missing
+	if err := ctrl.SetControllerReference(ownerNamespace, subspace, r.Scheme); err != nil {
+		return err
+	}
+	if err := r.Update(ctx, subspace); err != nil {
+		if !apierrors.IsConflict(err) {
+			log.V(2).Error(err, "Could not update Subspace Phase from 'None' to 'Missing'")
+			return err
+		}
+		log.V(2).Info("newer resource version exists")
+	}
+	return nil
+
+}
+
+func (r *SubnamespaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if err := openshiftv1.AddToScheme(mgr.GetScheme()); err != nil {
+
+	}
+
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&danav1alpha1.Subnamespace{}).
+		Complete(r)
+}
+
+func (r *SubnamespaceReconciler) UpdateSubspacePhase(ctx context.Context, log logr.Logger, subspace *danav1alpha1.Subnamespace, phase danav1alpha1.Phase) error {
+	subspace.Status.Phase = phase
+	if err := r.Update(ctx, subspace); err != nil {
+		if !apierrors.IsConflict(err) {
+			log.V(2).Error(err, "Could not update Subspace Phase from 'Missing' to 'Created'")
+			return err
+		}
+		log.V(2).Info("newer resource version exists")
+	}
+	return nil
 }
 
 func GetNewChildNamespace(ownerNamespace *v1.Namespace, subspace *danav1alpha1.Subnamespace) v1.Namespace {
@@ -200,76 +270,4 @@ func SetCrqSelectorAnnotations(ownerNamespace *v1.Namespace, childCRQ *openshift
 
 func GetChildNamespaceName(ownerNamespace *v1.Namespace, subspace *danav1alpha1.Subnamespace) string {
 	return ownerNamespace.Name + "-" + subspace.Name
-}
-
-func (r *SubnamespaceReconciler) CreateNamespace(ctx context.Context, log logr.Logger, ownerNamespace *v1.Namespace, subspace *danav1alpha1.Subnamespace) error {
-	var childNamespace = GetNewChildNamespace(ownerNamespace, subspace)
-
-	if err := r.Create(ctx, &childNamespace); err != nil {
-		log.V(2).Error(err, "Could not create child namespace")
-		return err
-	}
-	return nil
-
-}
-
-func (r *SubnamespaceReconciler) CreateCRQ(ctx context.Context, log logr.Logger, ownerNamespace *v1.Namespace, subspace *danav1alpha1.Subnamespace) error {
-	childCRQ := GetNewChildCRQ(ownerNamespace, subspace)
-	if err := r.Create(ctx, &childCRQ); err != nil {
-		log.V(2).Error(err, "Could not create child namespace")
-		return err
-	}
-	return nil
-
-}
-
-func (r *SubnamespaceReconciler) UpdateCRQ(ctx context.Context, log logr.Logger, crqToUpdate *openshiftv1.ClusterResourceQuota, subspace *danav1alpha1.Subnamespace, crqName string) error {
-	if err := r.Get(ctx, client.ObjectKey{Name: crqName}, crqToUpdate); err != nil {
-		log.V(2).Error(err, "Could not find CRQ")
-		return err
-	}
-	crqToUpdate.Spec.Quota = subspace.Spec.ResourceQuotaSpec
-	if err := r.Update(ctx, crqToUpdate); err != nil {
-		log.V(2).Error(err, "Could not update CRQ")
-		return err
-	}
-	return nil
-}
-
-func (r *SubnamespaceReconciler) InitSubspace(ctx context.Context, log logr.Logger, ownerNamespace *v1.Namespace, subspace *danav1alpha1.Subnamespace, childNamespaceName string) error {
-	subspace.SetAnnotations(map[string]string{danav1alpha1.Pointer: childNamespaceName})
-	subspace.Status.Phase = danav1alpha1.Missing
-	if err := ctrl.SetControllerReference(ownerNamespace, subspace, r.Scheme); err != nil {
-		return err
-	}
-	if err := r.Update(ctx, subspace); err != nil {
-		if !apierrors.IsConflict(err) {
-			log.V(2).Error(err, "Could not update Subspace Phase from 'None' to 'Missing'")
-			return err
-		}
-		log.V(2).Info("newer resource version exists")
-	}
-	return nil
-
-}
-func (r *SubnamespaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if err := openshiftv1.AddToScheme(mgr.GetScheme()); err != nil {
-
-	}
-
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&danav1alpha1.Subnamespace{}).
-		Complete(r)
-}
-
-func (r *SubnamespaceReconciler) UpdateSubspacePhase(ctx context.Context, log logr.Logger, subspace *danav1alpha1.Subnamespace, phase danav1alpha1.Phase) error {
-	subspace.Status.Phase = phase
-	if err := r.Update(ctx, subspace); err != nil {
-		if !apierrors.IsConflict(err) {
-			log.V(2).Error(err, "Could not update Subspace Phase from 'Missing' to 'Created'")
-			return err
-		}
-		log.V(2).Info("newer resource version exists")
-	}
-	return nil
 }
