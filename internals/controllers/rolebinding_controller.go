@@ -21,7 +21,6 @@ import (
 	//"strconv"
 	"context"
 	danav1alpha1 "github.com/Dana-Team/SNS/api/v1alpha1"
-	"github.com/Dana-Team/SNS/internals/webhooks"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -31,7 +30,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // RoleBindingReconciler reconciles a RoleBinding object
@@ -105,7 +103,7 @@ func (r *RoleBindingReconciler) rbDelete(ctx context.Context, log logr.Logger, r
 	var RbToDelete rbacv1.RoleBinding
 
 	for _, sns := range snsList.Items {
-		RbToDelete = buildRbs(rb, sns)
+		RbToDelete = buildRbs(rb, &sns)
 		if err := r.Delete(ctx, &RbToDelete); err != nil {
 			if !apierrors.IsNotFound(err) {
 				log.V(2).Error(err, "unable to delete rolebinding")
@@ -141,7 +139,7 @@ func (r *RoleBindingReconciler) rbCreate(ctx context.Context, log logr.Logger, r
 		if RbToCreate.Name != "" {
 			continue
 		}
-		RbToCreate = buildRbs(rb, sns)
+		RbToCreate = buildRbs(rb, &sns)
 		if err := r.Create(ctx, &RbToCreate); err != nil {
 			if !apierrors.IsConflict(err) {
 				log.V(2).Error(err, "unable to create rolebinding")
@@ -155,7 +153,7 @@ func (r *RoleBindingReconciler) rbCreate(ctx context.Context, log logr.Logger, r
 }
 
 //build rb object
-func buildRbs(rb *rbacv1.RoleBinding, sns danav1alpha1.Subnamespace) rbacv1.RoleBinding {
+func buildRbs(rb *rbacv1.RoleBinding, sns *danav1alpha1.Subnamespace) rbacv1.RoleBinding {
 	var NamespaceName string
 	NamespaceName = sns.ObjectMeta.Annotations[danav1alpha1.Pointer]
 	return rbacv1.RoleBinding{
