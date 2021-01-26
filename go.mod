@@ -8,6 +8,7 @@ require (
 	github.com/onsi/gomega v1.10.2
 	github.com/openshift/api v3.9.0+incompatible
 	github.com/prometheus/common v0.10.0
+	gopkg.in/openshift/origin.v1 v1.5.1 // indirect
 	k8s.io/api v0.19.2
 	k8s.io/apimachinery v0.19.2
 	k8s.io/client-go v0.19.2
